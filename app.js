@@ -60,19 +60,21 @@ async function guardarEquipo(equipo) {
 }
 
 async function clearAll() {
-  if (!confirm(`¿Borrar los ${allEquipos.length} equipos?`)) return;
+  if (!confirm(`¿Borrar los ${allEquipos.length} equipos de Firebase?\nEsta acción NO se puede deshacer.`)) return;
+  
   try {
     const batch = db.batch();
     allEquipos.forEach(eq => {
-      const docRef = db.collection('equipos').doc(eq.id);
+      const docRef = db.collection('equipos').doc(eq.firebaseId || eq.id);
       batch.delete(docRef);
     });
     await batch.commit();
     allEquipos = [];
+    alert('✅ Todos los equipos borrados de Firebase');
     renderAllQRs();
     renderAllBars();
   } catch (error) {
-    alert('Error borrando: ' + error.message);
+    alert('❌ Error: ' + error.message);
   }
 }
 
@@ -247,38 +249,62 @@ async function performSearch(query) {
 
 // ─── RENDER PANOLES ──────────────────────────────────────────────
 async function renderAllQRs() {
-  await loadAllEquipos();
   const container = document.getElementById('all-qr-list');
-  
+  const info = document.getElementById('qr-info');
+  const actions = document.getElementById('qr-actions');
+  const countEl = document.getElementById('qr-count');
+  const plural1 = document.getElementById('qr-plural');
+  const plural2 = document.getElementById('qr-plural2');
+
+  await loadAllEquipos();
+
   if (allEquipos.length === 0) {
-    container.innerHTML = '<div class="empty-msg">No hay equipos</div>';
+    container.innerHTML = '<div class="empty-msg">— Registra tu primer equipo en "Generar" —</div>';
+    info.style.display = actions.style.display = 'none';
     return;
   }
-  
-  container.innerHTML = `
-    <div style="margin-bottom:20px">
-      <strong>${allEquipos.length} equipos encontrados:</strong><br>
-      ${allEquipos.map(e=>`<span style="background:#e0e0e0;padding:2px 6px;margin:2px;font-family:monospace">${e.id}</span>`).join('')}
-    </div>
-    <div class="all-grid" id="qr-grid"></div>`;
-    
-  const grid = document.getElementById('qr-grid');
-  allEquipos.slice(0, 12).forEach((eq, i) => { // Solo 12 para prueba
-    const div = document.createElement('div');
-    div.className = 'code-card';
-    div.innerHTML = `<div id="qr-${i}"></div><strong>${eq.nombre}</strong><div class="card-id">${eq.id}</div>`;
-    grid.appendChild(div);
-    
+
+  // INFO
+  countEl.textContent = allEquipos.length;
+  plural1.textContent = plural2.textContent = allEquipos.length === 1 ? '' : 's';
+  info.style.display = 'block';
+  actions.style.display = 'flex';
+
+  // GRID
+  container.innerHTML = '<div class="all-grid" id="all-qr-grid"></div>';
+  const grid = document.getElementById('all-qr-grid');
+
+  allEquipos.forEach((eq, i) => {
+    const card = document.createElement('div');
+    card.className = 'code-card';
+    card.innerHTML = `
+      <div id="aqr-${i}"></div>
+      <strong>${eq.nombre}</strong>
+      <div class="card-id">${eq.id}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:2px;">${eq.generado}</div>`;
+    grid.appendChild(card);
+
     setTimeout(() => {
-      const el = document.getElementById(`qr-${i}`);
-      el.innerHTML = '';
-      const canvas = document.createElement('canvas');
-      el.appendChild(canvas);
-      new QRious({element: canvas, value: eq.id, size: 120}); // Solo ID para prueba
-    }, 100 * i);
+      try {
+        const qrElement = document.getElementById(`aqr-${i}`);
+        qrElement.innerHTML = "";
+        const canvas = document.createElement('canvas');
+        qrElement.appendChild(canvas);
+        new QRious({
+          element: canvas,
+          value: getQRData(eq),
+          size: 120,
+          level: 'M'
+        });
+      } catch(e) {
+        console.error("QR error:", e);
+      }
+    }, 50 * i + 50);
   });
 }
 
+
+// ─── RENDER BARCODES (COMPLETO + UNIFORME) ──────────────────────
 async function renderAllBars() {
   const container = document.getElementById('all-bar-list');
   const info = document.getElementById('bar-info');
@@ -287,17 +313,21 @@ async function renderAllBars() {
   const plural1 = document.getElementById('bar-plural');
   const plural2 = document.getElementById('bar-plural2');
 
+  await loadAllEquipos();
+
   if (allEquipos.length === 0) {
     container.innerHTML = '<div class="empty-msg">— Genera códigos de barras primero —</div>';
     info.style.display = actions.style.display = 'none';
     return;
   }
 
+  // INFO
   countEl.textContent = allEquipos.length;
   plural1.textContent = plural2.textContent = allEquipos.length === 1 ? '' : 's';
   info.style.display = 'block';
   actions.style.display = 'flex';
 
+  // GRID
   container.innerHTML = '<div class="all-grid" id="all-bar-grid"></div>';
   const grid = document.getElementById('all-bar-grid');
 
@@ -309,7 +339,8 @@ async function renderAllBars() {
         <svg id="abar-${i}"></svg>
       </div>
       <strong>${eq.nombre}</strong>
-      <div class="card-id">${eq.id}</div>`;
+      <div class="card-id">${eq.id}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:2px;">${eq.generado}</div>`;
     grid.appendChild(card);
 
     setTimeout(() => {
@@ -319,13 +350,17 @@ async function renderAllBars() {
           width: 1.8,
           height: 50,
           displayValue: true,
-          fontSize: 11
+          fontSize: 11,
+          margin: 6,
+          lineColor: '#1a1814',
+          background: '#ffffff'
         });
-      } catch(e) {}
+      } catch(e) {
+        console.error("Barcode error:", e);
+      }
     }, 40 * i);
   });
 }
-
 // ─── FUNCIONES ANTIGUAS (sin cambios) ────────────────────────────
 function downloadQRImg(id, nombre) {
   const el = document.querySelector(`#new-qr-${id} canvas, #aqr-${allEquipos.findIndex(e=>e.id===id)} canvas`);
