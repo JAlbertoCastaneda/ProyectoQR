@@ -8,6 +8,10 @@
   <!-- Librerías externas -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+  
+  <!--  FIREBASE -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
   <!-- Estilos propios -->
   <link rel="stylesheet" href="styles.css">
@@ -22,13 +26,14 @@
     </svg>
   </div>
   <h1>INVENTARIO QR/CODIGO DE BARRAS</h1>
-  <span class="version">v2.0</span>
+  <span class="version">v2.1  FIREBASE</span>
 </header>
 
 <div class="tabs">
   <button class="tab active" onclick="switchTab('gen')">+ Generar QR / Código de barras</button>
   <button class="tab" onclick="switchTab('qrs')">Códigos QR generados</button>
   <button class="tab" onclick="switchTab('bars')">Códigos de barras generados</button>
+  <button class="tab" onclick="switchTab('search')">🔍 Buscar equipos</button>
 </div>
 
 <!-- ═══════════════════════════════════════════════ PANEL: GENERAR -->
@@ -41,6 +46,7 @@
       <label>ID del equipo * (asígnalo tú)</label>
       <input type="text" id="f-id" placeholder="Ej: EQ-001, LAP-2024-003, PC-OFICINA-05">
     </div>
+    <!-- ... resto del formulario IGUAL ... -->
     <div class="field">
       <label>Nombre del equipo *</label>
       <input type="text" id="f-nombre" placeholder="Laptop Dell Inspiron">
@@ -98,7 +104,10 @@
   </div>
 
   <div class="btn-row">
-    <button class="btn-primary" onclick="generateAll()">Generar</button>
+    <button class="btn-primary" onclick="generateAll()">
+      <span id="gen-btn-text">Generar</span>
+      <span id="gen-loading" style="display:none;"> Guardando...</span>
+    </button>
     <button onclick="clearForm()">Limpiar</button>
   </div>
 
@@ -110,11 +119,13 @@
 <div id="panel-qrs" class="panel">
 <main>
   <p class="section-title">Códigos QR generados</p>
-  <div class="info-box" id="qr-info" style="display:none;"></div>
+  <div class="info-box" id="qr-info" style="display:none;">
+    <span id="qr-count">0</span> equipo<span id="qr-plural"></span> registrado<span id="qr-plural2"></span>
+  </div>
   <div id="all-qr-list"></div>
   <div class="actions-bar" id="qr-actions" style="display:none;">
-    <button class="btn-primary" onclick="printPanel('qrs')">Imprimir todos los QR</button>
-    <button class="btn-danger" onclick="clearAllQRs()">Borrar todos</button>
+    <button class="btn-primary" onclick="printPanel('qrs')"> Imprimir todos los QR</button>
+    <button class="btn-danger" onclick="clearAll()"> Borrar todos</button>
   </div>
 </main>
 </div>
@@ -123,16 +134,37 @@
 <div id="panel-bars" class="panel">
 <main>
   <p class="section-title">Códigos de barras generados</p>
-  <div class="info-box" id="bar-info" style="display:none;"></div>
+  <div class="info-box" id="bar-info" style="display:none;">
+    <span id="bar-count">0</span> equipo<span id="bar-plural"></span> registrado<span id="bar-plural2"></span>
+  </div>
   <div id="all-bar-list"></div>
   <div class="actions-bar" id="bar-actions" style="display:none;">
-    <button class="btn-primary" onclick="printPanel('bars')">Imprimir todos los códigos de barras</button>
-    <button class="btn-danger" onclick="clearAllQRs()">Borrar todos</button>
+    <button class="btn-primary" onclick="printPanel('bars')"> Imprimir todos los códigos de barras</button>
+    <button class="btn-danger" onclick="clearAll()"> Borrar todos</button>
+  </div>
+</main>
+</div>
+
+<!--  ═══════════════════════════════════════════════ PANEL: BUSCADOR -->
+<div id="panel-search" class="panel">
+<main>
+  <p class="section-title"> Buscar equipos</p>
+  
+  <div class="field full">
+    <label>Buscar por ID, nombre, serie o responsable</label>
+    <input type="text" id="search-input" placeholder="Ej: LAP-001, Dell, Juan García..." 
+           oninput="debouncedSearch(this.value)">
+  </div>
+  
+  <div id="search-results" class="search-results">
+    <div class="empty-msg">
+      Escribe para buscar entre todos tus equipos...<br>
+      <small>Busca por ID, nombre, serie, modelo, responsable o ubicación</small>
+    </div>
   </div>
 </main>
 </div>
 
 <script src="app.js"></script>
-
 </body>
 </html>

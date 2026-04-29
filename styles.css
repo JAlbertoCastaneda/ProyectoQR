@@ -308,3 +308,96 @@ button:active { transform: scale(0.98); }
   .panel { display: block !important; }
   .panel:not(.print-target) { display: none !important; }
 }
+
+/* NUEVOS ESTILOS PARA BUSCADOR */
+.search-results {
+  margin-top: 20px;
+}
+
+.search-result {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+  animation: fadeIn 0.3s ease;
+}
+
+.search-result:last-child { margin-bottom: 0; }
+
+.search-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.search-id {
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--text);
+  background: var(--surface2);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+}
+
+.search-name { font-size: 18px; margin: 4px 0; color: var(--text); }
+
+.search-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.search-badge {
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+}
+.search-badge-good { background: var(--green-bg); color: var(--green-text); }
+.search-badge-regular { background: var(--amber-bg); color: var(--amber-text); }
+.search-badge-bad { background: var(--red-bg); color: var(--red-text); }
+
+.search-row { 
+  display: flex; 
+  justify-content: space-between; 
+  font-size: 13px; 
+  margin-bottom: 4px;
+}
+.search-row .lbl { 
+  color: var(--text3); 
+  font-family: 'Courier New', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+}
+
+.search-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+#search-loading {
+  display: none;
+  padding: 20px;
+  text-align: center;
+  color: var(--text2);
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top: 2px solid var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 10px;
+}
+
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
