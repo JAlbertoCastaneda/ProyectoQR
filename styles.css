@@ -416,3 +416,26 @@ button:active { transform: scale(0.98); }
   color: var(--text2);
   margin-top: 4px;
 }
+
+.code-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;  /* ← Centro HORIZONTAL */
+  text-align: center;
+}
+
+.code-card > div:first-child {  /* El contenedor del QR */
+  flex: 1;
+  display: flex;
+  align-items: center;     /* ← Centro VERTICAL */
+  justify-content: center; /* ← Centro HORIZONTAL */
+  min-height: 120px;       /* Altura fija del área QR */
+  width: 100%;
+}
+
+.code-card canvas {
+  max-width: 160px;  /* ← Ajusta según tu size */
+  max-height: 160px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}

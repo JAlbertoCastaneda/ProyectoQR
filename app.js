@@ -34,13 +34,16 @@ function switchTab(name) {
 // ─── CARGAR / GUARDAR FIREBASE ───────────────────────────────────
 async function loadAllEquipos() {
   try {
-    console.log(' Cargando de Firebase...');
+    console.log('🔄 Cargando de Firebase...');
     const snapshot = await db.collection('equipos').get();
-    allEquipos = snapshot.docs.map(doc => doc.data()); // SIN firebaseId
-    console.log('', allEquipos.length, 'equipos:', allEquipos.map(e=>e.id));
+    allEquipos = snapshot.docs.map(doc => ({
+      firebaseId: doc.id,
+      ...doc.data()
+    }));
+    console.log(`✅ ${allEquipos.length} equipos cargados`);
     return allEquipos;
   } catch (error) {
-    console.error(' Error:', error);
+    console.error('❌ Error:', error);
     return [];
   }
 }
@@ -60,34 +63,57 @@ async function guardarEquipo(equipo) {
 }
 
 async function clearAll() {
-  if (!confirm(`¿Borrar los ${allEquipos.length} equipos de Firebase?\nEsta acción NO se puede deshacer.`)) return;
+  if (!confirm(`🗑️ ¿Borrar los ${allEquipos.length} equipos de Firebase?\n❌ NO se puede deshacer`)) return;
   
   try {
+    // ✅ OBTENER TODOS LOS DOCUMENTOS DIRECTAMENTE
+    const snapshot = await db.collection('equipos').get();
+    
+    if (snapshot.empty) {
+      alert('✅ No hay equipos para eliminar');
+      return;
+    }
+    
+    // ✅ BATCH con REFERENCIAS REALES
     const batch = db.batch();
-    allEquipos.forEach(eq => {
-      const docRef = db.collection('equipos').doc(eq.firebaseId || eq.id);
-      batch.delete(docRef);
+    snapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);  // ✅ doc.ref es la referencia REAL
     });
+    
     await batch.commit();
-    allEquipos = [];
-    alert('✅ Todos los equipos borrados de Firebase');
+    
+    allEquipos = [];  // ✅ Limpiar localmente
+    alert(`✅ ¡${snapshot.size} equipos ELIMINADOS de Firebase!`);
+    
     renderAllQRs();
     renderAllBars();
+    
   } catch (error) {
+    console.error('❌ Error eliminando:', error);
     alert('❌ Error: ' + error.message);
   }
 }
 
 // ─── GENERAR ────────────────────────────────────────────────────
 function getQRData(eq) {
-  return `ID: ${eq.id}
-EQUIPO: ${eq.nombre}
-SERIE: ${eq.serie || 'N/A'}
-MODELO: ${eq.modelo || 'N/A'}
-UBICACIÓN: ${eq.ubicacion || 'N/A'}
-RESPONSABLE: ${eq.responsable || 'N/A'}
-ESTADO: ${eq.estado}
-REGISTRO: ${eq.generado}`;
+  const lines = [
+    `ID: ${eq.id}`,
+    `EQUIPO: ${eq.nombre}`,
+    `SERIE: ${eq.serie || 'N/A'}`,
+    `MODELO: ${eq.modelo || 'N/A'}`,
+    `UBICACIÓN: ${eq.ubicacion || 'N/A'}`,
+    `RESPONSABLE: ${eq.responsable || 'N/A'}`,
+    `ESTADO: ${eq.estado}`,
+    `REGISTRO: ${eq.generado}`
+  ];
+
+  if (eq.notas && eq.notas.trim()) {
+    lines.push('');
+    lines.push('NOTAS:');
+    lines.push(eq.notas);
+  }
+
+  return lines.join('\n');
 }
 
 async function generateAll() {
@@ -163,32 +189,47 @@ async function generateAll() {
     </div>`;
 
   // Generar códigos visuales
+ setTimeout(() => {
+  try {
+    const qrEl = document.getElementById(`new-qr-${equipo.id}`);
+    if (qrEl) {
+      qrEl.innerHTML = "";
+      const canvas = document.createElement('canvas');
+      qrEl.appendChild(canvas);
+      new QRious({
+        element: canvas,
+        value: getQRData(equipo),
+        size: 160,
+        level: 'M'
+      });
+    }
+  } catch(e) {
+    console.error("QR error:", e);
+  }
+
   setTimeout(() => {
     try {
-      const qrEl = document.getElementById(`new-qr-${equipo.id}`);
-      if (qrEl) {
-        qrEl.innerHTML = "";
-        const canvas = document.createElement('canvas');
-        qrEl.appendChild(canvas);
-        new QRious({
-          element: canvas,
-          value: getQRData(equipo),
-          size: 150,
-          level: 'M'
+      const svgId = `barsvg-${equipo.id}`;
+      const svgEl = document.getElementById(svgId);
+      
+      if (svgEl) {
+        JsBarcode(`#${svgId}`, equipo.id, {
+          format: 'CODE128',
+          width: 2,
+          height: 60,
+          displayValue: true,
+          fontSize: 13
         });
+        console.log(` Barcode generado: ${svgId}`);
+      } else {
+        console.error(` SVG no encontrado: #${svgId}`);
       }
-    } catch(e) {}
+    } catch(e) {
+      console.error("Barcode error:", e);
+    }
+  }, 300); 
 
-    try {
-      JsBarcode(`#barsvg-${equipo.id}`, equipo.id, {
-        format: 'CODE128',
-        width: 2,
-        height: 60,
-        displayValue: true,
-        fontSize: 13
-      });
-    } catch(e) {}
-  }, 200);
+}, 400); 
 }
 
 // ─── BUSCADOR  ─────────────────────────────────────────────────
@@ -293,7 +334,7 @@ async function renderAllQRs() {
         new QRious({
           element: canvas,
           value: getQRData(eq),
-          size: 120,
+          size: 140,
           level: 'M'
         });
       } catch(e) {
@@ -347,10 +388,10 @@ async function renderAllBars() {
       try {
         JsBarcode(`#abar-${i}`, eq.id, {
           format: 'CODE128',
-          width: 1.8,
-          height: 50,
+          width: 2.2,
+          height: 70,
           displayValue: true,
-          fontSize: 11,
+          fontSize: 15,
           margin: 6,
           lineColor: '#1a1814',
           background: '#ffffff'
