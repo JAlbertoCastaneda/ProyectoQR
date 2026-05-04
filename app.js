@@ -143,6 +143,7 @@ async function generateAll() {
   const equipo = {
     id: idVal,
     nombre,
+    empresa: document.getElementById('f-empresa').value.trim(),
     serie: document.getElementById('f-serie').value.trim(),
     modelo: document.getElementById('f-modelo').value.trim(),
     categoria: document.getElementById('f-categoria').value,
@@ -206,6 +207,7 @@ function startEdit(equipo, docId) {
   // 📝 LLENAR FORMULARIO
   document.getElementById('f-id').value = equipo.id;
   document.getElementById('f-nombre').value = equipo.nombre;
+  document.getElementById('f-empresa').value = equipo.empresa || '';
   document.getElementById('f-serie').value = equipo.serie || '';
   document.getElementById('f-modelo').value = equipo.modelo || '';
   document.getElementById('f-categoria').value = equipo.categoria || '';
@@ -358,7 +360,7 @@ resultsEl.innerHTML = matches.map(eq => `
 }
 
 // ─── RENDER PANOLES ──────────────────────────────────────────────
-async function renderAllQRs() {
+async function renderAllQRs(filtro = {}) {
   const container = document.getElementById('all-qr-list');
   const info = document.getElementById('qr-info');
   const actions = document.getElementById('qr-actions');
@@ -380,11 +382,62 @@ async function renderAllQRs() {
   info.style.display = 'block';
   actions.style.display = 'flex';
 
+  // Obtener empresas únicas para el select
+  const empresas = [...new Set(allEquipos.map(e => e.empresa).filter(Boolean))].sort();
+
+  // Render filtros si no existen aún
+  if (!document.getElementById('qr-filter-bar')) {
+    const filterBar = document.createElement('div');
+    filterBar.id = 'qr-filter-bar';
+    filterBar.className = 'filter-bar';
+    filterBar.innerHTML = `
+      <div class="filter-group">
+        <label class="filter-label">Empresa</label>
+        <select id="qr-filter-empresa" onchange="applyQRFilters()">
+          <option value="">Todas</option>
+          ${empresas.map(e => `<option value="${e}">${e}</option>`).join('')}
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Ordenar por</label>
+        <select id="qr-filter-orden" onchange="applyQRFilters()">
+          <option value="">Sin orden</option>
+          <option value="fecha-asc">Fecha ↑ (más antigua)</option>
+          <option value="fecha-desc">Fecha ↓ (más reciente)</option>
+          <option value="responsable">Responsable A→Z</option>
+        </select>
+      </div>
+      <button class="btn-clear-filter" onclick="clearQRFilters()">✕ Limpiar</button>
+    `;
+    container.parentNode.insertBefore(filterBar, container);
+  } else {
+    // Actualizar opciones de empresa si cambiaron
+    const sel = document.getElementById('qr-filter-empresa');
+    const current = sel.value;
+    sel.innerHTML = `<option value="">Todas</option>${empresas.map(e => `<option value="${e}">${e}</option>`).join('')}`;
+    sel.value = current;
+  }
+
+  // Aplicar filtro y orden
+  let lista = [...allEquipos];
+  const filterEmpresa = filtro.empresa ?? document.getElementById('qr-filter-empresa')?.value ?? '';
+  const filterOrden   = filtro.orden   ?? document.getElementById('qr-filter-orden')?.value   ?? '';
+
+  if (filterEmpresa) lista = lista.filter(e => e.empresa === filterEmpresa);
+
+  if (filterOrden === 'fecha-asc')   lista.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+  if (filterOrden === 'fecha-desc')  lista.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  if (filterOrden === 'responsable') lista.sort((a, b) => (a.responsable || '').localeCompare(b.responsable || ''));
+
   // GRID
-  container.innerHTML = '<div class="all-grid" id="all-qr-grid"></div>';
+  container.innerHTML = lista.length === 0
+    ? '<div class="empty-msg">— No hay equipos con ese filtro —</div>'
+    : '<div class="all-grid" id="all-qr-grid"></div>';
+
+  if (lista.length === 0) return;
   const grid = document.getElementById('all-qr-grid');
 
-  allEquipos.forEach((eq, i) => {
+  lista.forEach((eq, i) => {
     const card = document.createElement('div');
     card.className = 'code-card';
     card.style.cursor = 'pointer';
@@ -392,8 +445,9 @@ async function renderAllQRs() {
     card.innerHTML = `
       <div id="aqr-${i}"></div>
       <strong>${eq.nombre}</strong>
+      ${eq.empresa ? `<div style="font-size:11px;color:var(--text2);font-family:'Courier New',monospace;margin-top:2px;">${eq.empresa}</div>` : ''}
       <div class="card-id">${eq.id}</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:2px;">${eq.generado}</div>`;
+      <div style="font-size:11px;color:var(--text3);margin-top:2px;">${eq.generado || ''}</div>`;
     card.addEventListener('click', () => openDetail(eq, eq.firebaseId));
     grid.appendChild(card);
 
@@ -416,9 +470,18 @@ async function renderAllQRs() {
   });
 }
 
+function applyQRFilters() { renderAllQRs(); }
+function clearQRFilters() {
+  const e = document.getElementById('qr-filter-empresa');
+  const o = document.getElementById('qr-filter-orden');
+  if (e) e.value = '';
+  if (o) o.value = '';
+  renderAllQRs();
+}
+
 
 // ─── RENDER BARCODES (COMPLETO + UNIFORME) ──────────────────────
-async function renderAllBars() {
+async function renderAllBars(filtro = {}) {
   const container = document.getElementById('all-bar-list');
   const info = document.getElementById('bar-info');
   const actions = document.getElementById('bar-actions');
@@ -440,11 +503,61 @@ async function renderAllBars() {
   info.style.display = 'block';
   actions.style.display = 'flex';
 
+  // Obtener empresas únicas
+  const empresas = [...new Set(allEquipos.map(e => e.empresa).filter(Boolean))].sort();
+
+  // Render filtros si no existen aún
+  if (!document.getElementById('bar-filter-bar')) {
+    const filterBar = document.createElement('div');
+    filterBar.id = 'bar-filter-bar';
+    filterBar.className = 'filter-bar';
+    filterBar.innerHTML = `
+      <div class="filter-group">
+        <label class="filter-label">Empresa</label>
+        <select id="bar-filter-empresa" onchange="applyBarFilters()">
+          <option value="">Todas</option>
+          ${empresas.map(e => `<option value="${e}">${e}</option>`).join('')}
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Ordenar por</label>
+        <select id="bar-filter-orden" onchange="applyBarFilters()">
+          <option value="">Sin orden</option>
+          <option value="fecha-asc">Fecha ↑ (más antigua)</option>
+          <option value="fecha-desc">Fecha ↓ (más reciente)</option>
+          <option value="responsable">Responsable A→Z</option>
+        </select>
+      </div>
+      <button class="btn-clear-filter" onclick="clearBarFilters()">✕ Limpiar</button>
+    `;
+    container.parentNode.insertBefore(filterBar, container);
+  } else {
+    const sel = document.getElementById('bar-filter-empresa');
+    const current = sel.value;
+    sel.innerHTML = `<option value="">Todas</option>${empresas.map(e => `<option value="${e}">${e}</option>`).join('')}`;
+    sel.value = current;
+  }
+
+  // Aplicar filtro y orden
+  let lista = [...allEquipos];
+  const filterEmpresa = filtro.empresa ?? document.getElementById('bar-filter-empresa')?.value ?? '';
+  const filterOrden   = filtro.orden   ?? document.getElementById('bar-filter-orden')?.value   ?? '';
+
+  if (filterEmpresa) lista = lista.filter(e => e.empresa === filterEmpresa);
+
+  if (filterOrden === 'fecha-asc')   lista.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+  if (filterOrden === 'fecha-desc')  lista.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  if (filterOrden === 'responsable') lista.sort((a, b) => (a.responsable || '').localeCompare(b.responsable || ''));
+
   // GRID
-  container.innerHTML = '<div class="all-grid" id="all-bar-grid"></div>';
+  container.innerHTML = lista.length === 0
+    ? '<div class="empty-msg">— No hay equipos con ese filtro —</div>'
+    : '<div class="all-grid" id="all-bar-grid"></div>';
+
+  if (lista.length === 0) return;
   const grid = document.getElementById('all-bar-grid');
 
-  allEquipos.forEach((eq, i) => {
+  lista.forEach((eq, i) => {
     const card = document.createElement('div');
     card.className = 'code-card';
     card.style.cursor = 'pointer';
@@ -454,8 +567,9 @@ async function renderAllBars() {
         <svg id="abar-${i}"></svg>
       </div>
       <strong>${eq.nombre}</strong>
+      ${eq.empresa ? `<div style="font-size:11px;color:var(--text2);font-family:'Courier New',monospace;margin-top:2px;">${eq.empresa}</div>` : ''}
       <div class="card-id">${eq.id}</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:2px;">${eq.generado}</div>`;
+      <div style="font-size:11px;color:var(--text3);margin-top:2px;">${eq.generado || ''}</div>`;
     card.addEventListener('click', () => openDetail(eq, eq.firebaseId));
     grid.appendChild(card);
 
@@ -476,6 +590,15 @@ async function renderAllBars() {
       }
     }, 40 * i);
   });
+}
+
+function applyBarFilters() { renderAllBars(); }
+function clearBarFilters() {
+  const e = document.getElementById('bar-filter-empresa');
+  const o = document.getElementById('bar-filter-orden');
+  if (e) e.value = '';
+  if (o) o.value = '';
+  renderAllBars();
 }
 // ─── FUNCIONES ANTIGUAS (sin cambios) ────────────────────────────
 function downloadQRImg(id, nombre) {
@@ -584,6 +707,7 @@ async function renderModalDetail(equipo) {
   document.getElementById('modal-data').innerHTML = `
     <div class="data-row"><div class="lbl">ID:</div><div><strong>${equipo.id}</strong></div></div>
     <div class="data-row"><div class="lbl">Equipo:</div><div>${equipo.nombre}</div></div>
+    <div class="data-row"><div class="lbl">Empresa:</div><div>${equipo.empresa || 'N/A'}</div></div>
     <div class="data-row"><div class="lbl">Serie:</div><div>${equipo.serie || 'N/A'}</div></div>
     <div class="data-row"><div class="lbl">Modelo:</div><div>${equipo.modelo || 'N/A'}</div></div>
     <div class="data-row"><div class="lbl">Categoría:</div><div>${equipo.categoria || 'N/A'}</div></div>
@@ -783,6 +907,7 @@ function editModal() {
 function openEditModal(equipo, docId) {
   document.getElementById('edit-id').value          = equipo.id;
   document.getElementById('edit-nombre').value      = equipo.nombre;
+  document.getElementById('edit-empresa').value     = equipo.empresa || '';
   document.getElementById('edit-serie').value       = equipo.serie || '';
   document.getElementById('edit-modelo').value      = equipo.modelo || '';
   document.getElementById('edit-categoria').value   = equipo.categoria || '';
@@ -809,6 +934,7 @@ async function saveEditModal() {
   const equipo = {
     id:          document.getElementById('edit-id').value.trim(),
     nombre:      document.getElementById('edit-nombre').value.trim(),
+    empresa:     document.getElementById('edit-empresa').value.trim(),
     serie:       document.getElementById('edit-serie').value.trim(),
     modelo:      document.getElementById('edit-modelo').value.trim(),
     categoria:   document.getElementById('edit-categoria').value,
@@ -893,4 +1019,5 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('f-fecha').valueAsDate = new Date();
   switchTab('gen');
 });
+    
     

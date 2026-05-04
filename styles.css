@@ -542,4 +542,50 @@ button:active { transform: scale(0.98); }
   flex-wrap: wrap;
 }
 
-@media (max-width: 500px) { .modal-actions { flex-direction: column; } }
+/* ═══════════════════════════════════════════════ FILTER BAR */
+.filter-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-width: 140px;
+}
+
+.filter-label {
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.06em;
+  color: var(--text3);
+  text-transform: uppercase;
+}
+
+.filter-bar select {
+  font-size: 13px;
+  padding: 8px 10px;
+}
+
+.btn-clear-filter {
+  padding: 8px 14px;
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+  border: 1px solid var(--border2);
+  background: var(--surface);
+  color: var(--text2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  align-self: flex-end;
+}
+.btn-clear-filter:hover { background: var(--red-bg); color: var(--red-text); border-color: var(--red); }
