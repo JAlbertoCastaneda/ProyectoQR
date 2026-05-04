@@ -1,4 +1,5 @@
 // FIREBASE CONFIG - TU PROYECTO
+let editingEquipoId = null;
 const firebaseConfig = {
   apiKey: "AIzaSyD1j68jVrkmrM-R7nzJBj9yDMXyUdExYi4",
   authDomain: "inventario-qr-3575a.firebaseapp.com",
@@ -61,6 +62,20 @@ async function guardarEquipo(equipo) {
     return false;
   }
 }
+async function actualizarEquipo(docId, equipo) {
+  try {
+    await db.collection('equipos').doc(docId).update({
+      ...equipo,
+      modificado: new Date().toLocaleDateString('es-MX'),
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    editingEquipoId = null; // ← Reset
+    return true;
+  } catch (error) {
+    console.error('Error actualizando:', error);
+    return false;
+  }
+}
 
 async function clearAll() {
   if (!confirm(`🗑️ ¿Borrar los ${allEquipos.length} equipos de Firebase?\n❌ NO se puede deshacer`)) return;
@@ -116,19 +131,13 @@ function getQRData(eq) {
   return lines.join('\n');
 }
 
+
 async function generateAll() {
   const idVal = document.getElementById('f-id').value.trim();
   const nombre = document.getElementById('f-nombre').value.trim();
 
   if (!idVal || !nombre) {
-    alert('ID y nombre son obligatorios');
-    return;
-  }
-
-  // Verificar duplicado
-  const existe = allEquipos.find(e => e.id === idVal);
-  if (existe) {
-    alert(`Ya existe "${idVal}". Usa otro ID.`);
+    alert('❌ ID y nombre son obligatorios');
     return;
   }
 
@@ -145,55 +154,113 @@ async function generateAll() {
     notas: document.getElementById('f-notas').value.trim()
   };
 
-  // Loading
-  document.getElementById('gen-btn-text').style.display = 'none';
-  document.getElementById('gen-loading').style.display = 'inline';
+  // 🔄 LOADING
+  const btnText = document.getElementById('gen-btn-text');
+  const btnLoading = document.getElementById('gen-loading');
+  btnText.style.display = 'none';
+  btnLoading.style.display = 'inline';
+  btnLoading.textContent = editingEquipoId ? 'Actualizando...' : 'Guardando...';
 
-  const guardado = await guardarEquipo(equipo);
-  await loadAllEquipos(); // Recargar lista
+  try {
+    let guardado = false;
 
-  // Mostrar resultado (IGUAL que antes)
-  document.getElementById('gen-btn-text').style.display = 'inline';
-  document.getElementById('gen-loading').style.display = 'none';
+    if (editingEquipoId) {
+      // ✏️ MODO EDITAR
+      guardado = await actualizarEquipo(editingEquipoId, equipo);
+      alert('✅ ¡Equipo actualizado en Firebase!');
+    } else {
+      // ➕ MODO NUEVO
+      const existe = allEquipos.find(e => e.id === idVal);
+      if (existe) {
+        alert(`⚠️ Ya existe "${idVal}". Usa otro ID o edita el existente.`);
+        resetGenerateBtn();
+        return;
+      }
+      guardado = await guardarEquipo(equipo);
+      alert('✅ ¡Equipo guardado en Firebase!');
+    }
 
-  if (!guardado) {
-    alert('Error guardando. Revisa tu conexión.');
-    return;
+    await loadAllEquipos();
+    showPreview(equipo);
+    resetGenerateBtn();
+
+  } catch (error) {
+    console.error('❌ Error:', error);
+    alert('❌ Error: ' + error.message);
+    resetGenerateBtn();
   }
+}
 
-  // Generar vista previa (tu código original)
-  const statusColor = equipo.estado === 'Bueno' ? 'good' : equipo.estado === 'De baja' ? 'bad' : 'regular';
+// 🔧 FUNCIONES AUXILIARES
+function resetGenerateBtn() {
+  const btnText = document.getElementById('gen-btn-text');
+  const btnLoading = document.getElementById('gen-loading');
+  btnText.style.display = 'inline';
+  btnLoading.style.display = 'none';
+  btnText.textContent = editingEquipoId ? 'Actualizar' : 'Generar';
+}
+
+function startEdit(equipo, docId) {
+  editingEquipoId = docId;
+  currentModalEquipo = equipo;
+  
+  // 📝 LLENAR FORMULARIO
+  document.getElementById('f-id').value = equipo.id;
+  document.getElementById('f-nombre').value = equipo.nombre;
+  document.getElementById('f-serie').value = equipo.serie || '';
+  document.getElementById('f-modelo').value = equipo.modelo || '';
+  document.getElementById('f-categoria').value = equipo.categoria || '';
+  document.getElementById('f-ubicacion').value = equipo.ubicacion || '';
+  document.getElementById('f-responsable').value = equipo.responsable || '';
+  document.getElementById('f-estado').value = equipo.estado;
+  document.getElementById('f-fecha').value = equipo.fecha || '';
+  document.getElementById('f-notas').value = equipo.notas || '';
+  
+  // 🔄 CAMBIAR PESTAÑA
+  switchTab('gen');
+  
+  // 🎨 CAMBIAR BOTÓN
+  const btnText = document.getElementById('gen-btn-text');
+  btnText.textContent = 'Actualizar';
+}
+
+function showPreview(equipo) {
+  const statusColor = getStatusColor(equipo.estado);
   const out = document.getElementById('gen-output');
+  
   out.innerHTML = `
-    <div style="height:1px; background:var(--border); margin: 20px 0;"></div>
+    <div style="height:1px;background:var(--border);margin:20px 0;"></div>
     <div class="gen-result">
       <div class="result-cols">
         <div class="code-block">
-          <div class="code-label"> Guardado en Firebase</div>
-          <div id="new-qr-${equipo.id}"></div>
-          <button class="btn-sm" onclick="downloadQRImg('${equipo.id}', '${nombre.replace(/'/g,"\\'")}')">📥 PNG</button>
+          <div class="code-label">✅ Guardado en Firebase</div>
+          <div id="new-qr-${equipo.id.replace(/[^a-z0-9]/gi,'')}"></div>
+          <button class="btn-sm" onclick="downloadQRImg('${equipo.id}', '${equipo.nombre.replace(/'/g,"\\'")}')">📥 PNG</button>
         </div>
         <div class="code-block">
           <div class="code-label">Código de barras</div>
-          <div class="barcode-wrap" id="new-bar-${equipo.id}">
-                      <svg id="barsvg-${equipo.id}"></svg>
-          </div>
-          <button class="btn-sm" onclick="downloadBarcode('${equipo.id}', '${nombre.replace(/'/g,"\\'")}')">📥 PNG</button>
+          <div class="barcode-wrap" id="new-bar-${equipo.id.replace(/[^a-z0-9]/gi,'')}"></div>
+          <button class="btn-sm" onclick="downloadBarcode('${equipo.id}', '${equipo.nombre.replace(/'/g,"\\'")}')">📥 PNG</button>
         </div>
         <div class="qr-data">
           <span class="badge badge-${statusColor}">${equipo.estado}</span>
           <div class="data-row"><div class="lbl">ID</div><div class="val" style="font-family:'Courier New',monospace;">${equipo.id}</div></div>
-          <div class="data-row"><div class="lbl">Equipo</div><div class="val">${nombre}</div></div>
+          <div class="data-row"><div class="lbl">Equipo</div><div class="val">${equipo.nombre}</div></div>
         </div>
       </div>
     </div>`;
 
-  // Generar códigos visuales
- setTimeout(() => {
+  // 🎨 GENERAR CÓDIGOS VISUALES
+  setTimeout(() => generatePreviewCodes(equipo), 200);
+}
+function generatePreviewCodes(equipo) {
+  const safeId = equipo.id.replace(/[^a-z0-9]/gi, '');
+  
+  // QR
   try {
-    const qrEl = document.getElementById(`new-qr-${equipo.id}`);
+    const qrEl = document.getElementById(`new-qr-${safeId}`);
     if (qrEl) {
-      qrEl.innerHTML = "";
+      qrEl.innerHTML = '';
       const canvas = document.createElement('canvas');
       qrEl.appendChild(canvas);
       new QRious({
@@ -204,15 +271,16 @@ async function generateAll() {
       });
     }
   } catch(e) {
-    console.error("QR error:", e);
+    console.error('QR error:', e);
   }
 
+  // Barcode
   setTimeout(() => {
     try {
-      const svgId = `barsvg-${equipo.id}`;
-      const svgEl = document.getElementById(svgId);
-      
-      if (svgEl) {
+      const barEl = document.getElementById(`new-bar-${safeId}`);
+      if (barEl) {
+        const svgId = `newbar-svg-${safeId}`;
+        barEl.innerHTML = `<svg id="${svgId}"></svg>`;
         JsBarcode(`#${svgId}`, equipo.id, {
           format: 'CODE128',
           width: 2,
@@ -220,16 +288,11 @@ async function generateAll() {
           displayValue: true,
           fontSize: 13
         });
-        console.log(` Barcode generado: ${svgId}`);
-      } else {
-        console.error(` SVG no encontrado: #${svgId}`);
       }
     } catch(e) {
-      console.error("Barcode error:", e);
+      console.error('Barcode error:', e);
     }
-  }, 300); 
-
-}, 400); 
+  }, 100);
 }
 
 // ─── BUSCADOR  ─────────────────────────────────────────────────
@@ -271,16 +334,20 @@ async function performSearch(query) {
     }
 
  // MOSTRAR RESULTADOS
-    resultsEl.innerHTML = matches.map(eq => `
-      <div class="search-result">
-        <h3 style="margin:0 0 10px 0;font-size:18px">${eq.nombre}</h3>
-        <div style="background:#f0f0f0;padding:8px;border-radius:6px;font-family:monospace;font-size:14px">
-          ID: <strong>${eq.id}</strong>
-        </div>
-        <p><strong>Serie:</strong> ${eq.serie || 'N/A'}</p>
-        <p><strong>Estado:</strong> ${eq.estado}</p>
-      </div>
-    `).join('');
+resultsEl.innerHTML = matches.map(eq => `
+  <div class="search-result" onclick="openDetail(${JSON.stringify(eq).replace(/"/g, '&quot;')}, '${eq.firebaseId}')" style="cursor:pointer; border-radius:8px; transition: all 0.2s;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h3 style="margin:0;font-size:18px">${eq.nombre}</h3>
+      <span class="badge badge-${getStatusColor(eq.estado)}">${eq.estado}</span>
+    </div>
+    <div style="background:#f0f0f0;padding:12px;border-radius:6px;font-family:monospace;font-size:14px;margin:10px 0;">
+      ID: <strong>${eq.id}</strong>
+    </div>
+    <div style="font-size:12px;color:var(--text2);">
+      📍 ${eq.ubicacion || 'Sin ubicación'} • 👤 ${eq.responsable || 'Sin responsable'}
+    </div>
+  </div>
+`).join('');
 
   } catch (error) {
     console.error('❌', error);
@@ -487,6 +554,202 @@ function printPanel(which) {
   document.getElementById(`panel-${which}`).classList.add('print-target');
   window.print();
 }
+// ═══════════════════════════════════════════════ MODAL DETALLE
+let currentModalEquipo = null;
+let currentModalDocId = null; // ✅ AGREGADO para editar/eliminar
+
+async function openDetail(equipo, docId) {
+  currentModalEquipo = equipo;
+  currentModalDocId = docId; // ✅ GUARDAR ID del documento
+  console.log('Abriendo modal:', equipo.id, docId); // DEBUG
+  
+  document.getElementById('detail-modal').style.display = 'flex';
+  await renderModalDetail(equipo);
+  document.body.style.overflow = 'hidden';
+}
+
+async function renderModalDetail(equipo) {
+  // Título
+  document.getElementById('modal-title').textContent = `${equipo.nombre} - ${equipo.id}`;
+  
+  // Datos (IGUAL)
+  document.getElementById('modal-data').innerHTML = `
+    <div class="data-row"><div class="lbl">ID:</div><div><strong>${equipo.id}</strong></div></div>
+    <div class="data-row"><div class="lbl">Equipo:</div><div>${equipo.nombre}</div></div>
+    <div class="data-row"><div class="lbl">Serie:</div><div>${equipo.serie || 'N/A'}</div></div>
+    <div class="data-row"><div class="lbl">Modelo:</div><div>${equipo.modelo || 'N/A'}</div></div>
+    <div class="data-row"><div class="lbl">Categoría:</div><div>${equipo.categoria || 'N/A'}</div></div>
+    <div class="data-row"><div class="lbl">Ubicación:</div><div>${equipo.ubicacion || 'N/A'}</div></div>
+    <div class="data-row"><div class="lbl">Responsable:</div><div>${equipo.responsable || 'N/A'}</div></div>
+    <div class="data-row"><div class="lbl">Estado:</div><div><span class="badge badge-${getStatusColor(equipo.estado)}">${equipo.estado}</span></div></div>
+    <div class="data-row"><div class="lbl">Fecha:</div><div>${equipo.fecha || 'N/A'}</div></div>
+    ${equipo.notas ? `<div class="data-row"><div class="lbl">Notas:</div><div>${equipo.notas}</div></div>` : ''}
+  `;
+  
+  // ✅ CÓDIGOS con MEJOR timing
+  setTimeout(() => generateModalCodes(equipo), 100);
+}
+
+function generateModalQR(eq) {
+  const qrEl = document.getElementById('modal-qr');
+  qrEl.innerHTML = '';
+  const canvas = document.createElement('canvas');
+  qrEl.appendChild(canvas);
+  new QRious({
+    element: canvas,
+    value: getQRData(eq),
+    size: 180,
+    level: 'M'
+  });
+}
+
+function generateModalBarcode(eq) {
+  const barEl = document.getElementById('modal-barcode');
+  barEl.innerHTML = '<svg id="modal-bar-svg"></svg>';
+  JsBarcode('#modal-bar-svg', eq.id, {
+    format: 'CODE128',
+    width: 2.5,
+    height: 80,
+    displayValue: true,
+    fontSize: 16
+  });
+}
+function generateModalCodes(eq) {
+  try {
+    generateModalQR(eq);
+  } catch(e) {
+    console.error('Modal QR error:', e);
+  }
+  
+  try {
+    generateModalBarcode(eq);
+  } catch(e) {
+    console.error('Modal Barcode error:', e);
+  }
+}
+
+function getStatusColor(estado) {
+  return estado === 'Bueno' ? 'good' : 
+         estado === 'De baja' ? 'bad' : 'regular';
+}
+
+// ═══════════════════════════════════════════════ ACCIONES
+function printSingleModal(type) {
+  const eq = currentModalEquipo;
+  if (!eq) {
+    alert('❌ Error: No hay equipo seleccionado');
+    return;
+  }
+
+  const printWindow = window.open('', '_blank', 'width=800,height=600');
+  
+  // SIMPLIFICAR: Generar QR data aquí
+  const qrData = getQRData(eq);
+  
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html><head>
+      <title>Imprimir ${eq.nombre} - ${type.toUpperCase()}</title>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 40px; max-width: 700px; margin: auto; }
+        .print-header { text-align: center; margin-bottom: 30px; }
+        .print-code { text-align: center; margin: 40px 0; padding: 20px; border: 2px solid #ddd; border-radius: 12px; }
+        canvas, svg { max-width: 100%; max-height: 300px; border-radius: 8px; }
+        .print-info { background: #f8f9fa; padding: 20px; border-radius: 8px; font-size: 16px; }
+        @media print { body { margin: 0; } }
+      </style>
+    </head><body>
+      <div class="print-header">
+        <h1>${eq.nombre}</h1>
+        <div style="font-size:24px;font-family:monospace;background:#eee;padding:10px;border-radius:6px;">
+          ${eq.id}
+        </div>
+      </div>
+      <div class="print-code" id="print-container">
+        ${type === 'qr' ? '<canvas id="print-qr"></canvas>' : '<svg id="print-bar"></svg>'}
+      </div>
+      <div class="print-info">
+        <strong>Estado:</strong> ${eq.estado} | 
+        <strong>Responsable:</strong> ${eq.responsable || 'N/A'} | 
+        <strong>${type === 'qr' ? 'QR Code' : 'Código de Barras'}</strong>
+      </div>
+      <script>
+        function waitForLibs() {
+          if (typeof QRious !== 'undefined' && typeof JsBarcode !== 'undefined') {
+            generateCode();
+          } else {
+            setTimeout(waitForLibs, 200);
+          }
+        }
+        waitForLibs();
+        
+        function generateCode() {
+          if ('${type}' === 'qr') {
+            new QRious({
+              element: document.getElementById('print-qr'),
+              value: \`${qrData.replace(/\\/g, '\\\\').replace(/`/g, '\\`')}\`,
+              size: 350,
+              level: 'M'
+            });
+          } else {
+            JsBarcode('#print-bar', '${eq.id}', {
+              format: 'CODE128',
+              width: 3,
+              height: 140,
+              displayValue: true,
+              fontSize: 24,
+              margin: 20
+            });
+          }
+          console.log('✅ Código generado en impresión');
+        }
+      </script>
+    </body></html>
+  `);
+  
+  printWindow.document.close();
+}
+
+function editModal() {
+  if (!currentModalEquipo || !currentModalDocId) {
+    alert('❌ Error: No se pudo cargar los datos');
+    return;
+  }
+  
+  closeModal();
+  startEdit(currentModalEquipo, currentModalDocId);
+}
+ 
+async function deleteSingleModal() {
+  if (!currentModalDocId) {
+    alert('❌ Error: No se encontró el documento');
+    return;
+  }
+  
+  if (!confirm(`🗑️ ¿Eliminar "${currentModalEquipo.nombre}"?\nNo se puede deshacer`)) return;
+  
+  try {
+    await db.collection('equipos').doc(currentModalDocId).delete();
+    alert('✅ Equipo eliminado correctamente');
+    closeModal();
+    await loadAllEquipos();
+    performSearch(document.getElementById('search-input').value);
+  } catch (error) {
+    console.error('Error:', error);
+    alert('❌ Error: ' + error.message);
+  }
+}
+  // ✅ FUNCIONES AUXILIARES
+
+function closeModal() {
+  document.getElementById('detail-modal').style.display = 'none';
+  document.body.style.overflow = 'auto';
+  currentModalEquipo = null;
+  currentModalDocId = null;
+}
+
 
 // ─── INICIALIZAR ─────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {

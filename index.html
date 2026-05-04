@@ -164,7 +164,50 @@
   </div>
 </main>
 </div>
-
 <script src="app.js"></script>
+<!-- ═══════════════════════════════════════════════ MODAL DETALLE -->
+<div id="detail-modal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="modal-title">Detalle del equipo</h2>
+      <button class="close-btn" onclick="closeModal()">&times;</button>
+    </div>
+    
+    <div class="modal-body">
+      <!-- DATOS -->
+      <div class="detail-grid">
+        <div class="detail-section">
+          <h3>📋 Información</h3>
+          <div id="modal-data"></div>
+        </div>
+        
+        <!-- CÓDIGOS -->
+        <div class="detail-section">
+          <h3>📱 Códigos</h3>
+          <div class="code-preview">
+            <div class="code-block">
+              <div class="code-label">QR</div>
+              <div id="modal-qr"></div>
+              <button class="btn-sm" onclick="printSingleModal('qr')">🖨️ Imprimir</button>
+            </div>
+            <div class="code-block">
+              <div class="code-label">Barcode</div>
+              <div id="modal-barcode"></div>
+              <button class="btn-sm" onclick="printSingleModal('barcode')">🖨️ Imprimir</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- ACCIONES -->
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="editModal()">✏️ Editar</button>
+      <button class="btn-danger" onclick="deleteSingleModal()">🗑️ Eliminar</button>
+      <button class="btn-secondary" onclick="closeModal()">❌ Cerrar</button>
+    </div>
+  </div>
+</div>
 </body>
+
 </html>
