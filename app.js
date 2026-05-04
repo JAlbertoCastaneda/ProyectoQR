@@ -69,7 +69,7 @@ async function actualizarEquipo(docId, equipo) {
       modificado: new Date().toLocaleDateString('es-MX'),
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     });
-    editingEquipoId = null; // ← Reset
+    editingEquipoId = null; // ← se limpia en resetGenerateBtn
     return true;
   } catch (error) {
     console.error('Error actualizando:', error);
@@ -130,7 +130,6 @@ function getQRData(eq) {
 
   return lines.join('\n');
 }
-
 
 async function generateAll() {
   const idVal = document.getElementById('f-id').value.trim();
@@ -197,11 +196,11 @@ function resetGenerateBtn() {
   const btnLoading = document.getElementById('gen-loading');
   btnText.style.display = 'inline';
   btnLoading.style.display = 'none';
-  btnText.textContent = editingEquipoId ? 'Actualizar' : 'Generar';
+  btnText.textContent = 'Generar';
+  editingEquipoId = null; // ✅ siempre limpiar aquí
 }
 
 function startEdit(equipo, docId) {
-  editingEquipoId = docId;
   currentModalEquipo = equipo;
   
   // 📝 LLENAR FORMULARIO
@@ -216,6 +215,9 @@ function startEdit(equipo, docId) {
   document.getElementById('f-fecha').value = equipo.fecha || '';
   document.getElementById('f-notas').value = equipo.notas || '';
   
+  // ✅ Asignar ANTES de switchTab para que el botón se renderice correctamente
+  editingEquipoId = docId;
+
   // 🔄 CAMBIAR PESTAÑA
   switchTab('gen');
   
@@ -385,11 +387,14 @@ async function renderAllQRs() {
   allEquipos.forEach((eq, i) => {
     const card = document.createElement('div');
     card.className = 'code-card';
+    card.style.cursor = 'pointer';
+    card.title = 'Ver detalle del equipo';
     card.innerHTML = `
       <div id="aqr-${i}"></div>
       <strong>${eq.nombre}</strong>
       <div class="card-id">${eq.id}</div>
       <div style="font-size:11px;color:var(--text3);margin-top:2px;">${eq.generado}</div>`;
+    card.addEventListener('click', () => openDetail(eq, eq.firebaseId));
     grid.appendChild(card);
 
     setTimeout(() => {
@@ -442,6 +447,8 @@ async function renderAllBars() {
   allEquipos.forEach((eq, i) => {
     const card = document.createElement('div');
     card.className = 'code-card';
+    card.style.cursor = 'pointer';
+    card.title = 'Ver detalle del equipo';
     card.innerHTML = `
       <div class="barcode-card-wrap">
         <svg id="abar-${i}"></svg>
@@ -449,6 +456,7 @@ async function renderAllBars() {
       <strong>${eq.nombre}</strong>
       <div class="card-id">${eq.id}</div>
       <div style="font-size:11px;color:var(--text3);margin-top:2px;">${eq.generado}</div>`;
+    card.addEventListener('click', () => openDetail(eq, eq.firebaseId));
     grid.appendChild(card);
 
     setTimeout(() => {
@@ -641,74 +649,125 @@ function printSingleModal(type) {
     return;
   }
 
-  const printWindow = window.open('', '_blank', 'width=800,height=600');
-  
-  // SIMPLIFICAR: Generar QR data aquí
   const qrData = getQRData(eq);
-  
+  const safeQrData = qrData.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
+
+  const printWindow = window.open('', '_blank', 'width=600,height=500');
+
   printWindow.document.write(`
     <!DOCTYPE html>
     <html><head>
-      <title>Imprimir ${eq.nombre} - ${type.toUpperCase()}</title>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+      <title>Imprimir ${eq.id}</title>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"><\/script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"><\/script>
       <style>
-        body { font-family: Arial, sans-serif; margin: 40px; max-width: 700px; margin: auto; }
-        .print-header { text-align: center; margin-bottom: 30px; }
-        .print-code { text-align: center; margin: 40px 0; padding: 20px; border: 2px solid #ddd; border-radius: 12px; }
-        canvas, svg { max-width: 100%; max-height: 300px; border-radius: 8px; }
-        .print-info { background: #f8f9fa; padding: 20px; border-radius: 8px; font-size: 16px; }
-        @media print { body { margin: 0; } }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: white; display: flex; justify-content: center; align-items: flex-start; padding: 20px; }
+
+        .code-card {
+          background: white;
+          border: 1px solid #ccc;
+          border-radius: 8px;
+          padding: 14px;
+          width: 180px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          font-family: Georgia, serif;
+        }
+
+        .card-code-area {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: ${type === 'qr' ? '140px' : '90px'};
+          width: 100%;
+        }
+
+        .card-code-area canvas {
+          max-width: 140px;
+          max-height: 140px;
+          border-radius: 4px;
+        }
+
+        .card-code-area svg {
+          max-width: 100%;
+          max-height: 80px;
+        }
+
+        .card-name {
+          font-size: 13px;
+          font-weight: normal;
+          margin-top: 8px;
+          color: #1a1814;
+        }
+
+        .card-id {
+          font-family: 'Courier New', monospace;
+          font-size: 11px;
+          color: #6b6560;
+          margin-top: 4px;
+        }
+
+        .card-date {
+          font-size: 11px;
+          color: #9b958e;
+          margin-top: 2px;
+        }
+
+        @media print {
+          body { padding: 0; }
+          .code-card { border: 1px solid #aaa; }
+        }
       </style>
     </head><body>
-      <div class="print-header">
-        <h1>${eq.nombre}</h1>
-        <div style="font-size:24px;font-family:monospace;background:#eee;padding:10px;border-radius:6px;">
-          ${eq.id}
+      <div class="code-card">
+        <div class="card-code-area">
+          ${type === 'qr' ? '<canvas id="print-code"></canvas>' : '<svg id="print-code"></svg>'}
         </div>
+        <div class="card-name">${eq.nombre}</div>
+        <div class="card-id">${eq.id}</div>
+        <div class="card-date">${eq.generado || ''}</div>
       </div>
-      <div class="print-code" id="print-container">
-        ${type === 'qr' ? '<canvas id="print-qr"></canvas>' : '<svg id="print-bar"></svg>'}
-      </div>
-      <div class="print-info">
-        <strong>Estado:</strong> ${eq.estado} | 
-        <strong>Responsable:</strong> ${eq.responsable || 'N/A'} | 
-        <strong>${type === 'qr' ? 'QR Code' : 'Código de Barras'}</strong>
-      </div>
+
       <script>
         function waitForLibs() {
           if (typeof QRious !== 'undefined' && typeof JsBarcode !== 'undefined') {
             generateCode();
           } else {
-            setTimeout(waitForLibs, 200);
+            setTimeout(waitForLibs, 150);
           }
         }
-        waitForLibs();
-        
+
         function generateCode() {
           if ('${type}' === 'qr') {
             new QRious({
-              element: document.getElementById('print-qr'),
-              value: \`${qrData.replace(/\\/g, '\\\\').replace(/`/g, '\\`')}\`,
-              size: 350,
+              element: document.getElementById('print-code'),
+              value: \`${safeQrData}\`,
+              size: 140,
               level: 'M'
             });
           } else {
-            JsBarcode('#print-bar', '${eq.id}', {
+            JsBarcode('#print-code', '${eq.id}', {
               format: 'CODE128',
-              width: 3,
-              height: 140,
+              width: 2.2,
+              height: 70,
               displayValue: true,
-              fontSize: 24,
-              margin: 20
+              fontSize: 15,
+              margin: 6,
+              lineColor: '#1a1814',
+              background: '#ffffff'
             });
           }
-          console.log('✅ Código generado en impresión');
+          setTimeout(() => { window.print(); }, 300);
         }
-      </script>
+
+        waitForLibs();
+      <\/script>
     </body></html>
   `);
-  
+
   printWindow.document.close();
 }
 
@@ -717,11 +776,89 @@ function editModal() {
     alert('❌ Error: No se pudo cargar los datos');
     return;
   }
-  
-  closeModal();
-  startEdit(currentModalEquipo, currentModalDocId);
+  openEditModal(currentModalEquipo, currentModalDocId);
 }
- 
+
+// ═══════════════════════════════════════════════ MODAL EDICIÓN
+function openEditModal(equipo, docId) {
+  document.getElementById('edit-id').value          = equipo.id;
+  document.getElementById('edit-nombre').value      = equipo.nombre;
+  document.getElementById('edit-serie').value       = equipo.serie || '';
+  document.getElementById('edit-modelo').value      = equipo.modelo || '';
+  document.getElementById('edit-categoria').value   = equipo.categoria || '';
+  document.getElementById('edit-ubicacion').value   = equipo.ubicacion || '';
+  document.getElementById('edit-responsable').value = equipo.responsable || '';
+  document.getElementById('edit-estado').value      = equipo.estado;
+  document.getElementById('edit-fecha').value       = equipo.fecha || '';
+  document.getElementById('edit-notas').value       = equipo.notas || '';
+  document.getElementById('edit-docid').value       = docId;
+
+  document.getElementById('edit-modal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+  document.body.style.overflow = 'auto';
+}
+
+async function saveEditModal() {
+  const docId = document.getElementById('edit-docid').value;
+  if (!docId) { alert('❌ Error interno: sin ID de documento'); return; }
+
+  const equipo = {
+    id:          document.getElementById('edit-id').value.trim(),
+    nombre:      document.getElementById('edit-nombre').value.trim(),
+    serie:       document.getElementById('edit-serie').value.trim(),
+    modelo:      document.getElementById('edit-modelo').value.trim(),
+    categoria:   document.getElementById('edit-categoria').value,
+    ubicacion:   document.getElementById('edit-ubicacion').value.trim(),
+    responsable: document.getElementById('edit-responsable').value.trim(),
+    estado:      document.getElementById('edit-estado').value,
+    fecha:       document.getElementById('edit-fecha').value,
+    notas:       document.getElementById('edit-notas').value.trim()
+  };
+
+  if (!equipo.id || !equipo.nombre) {
+    alert('❌ ID y nombre son obligatorios');
+    return;
+  }
+
+  const btn = document.getElementById('edit-save-btn');
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+
+  try {
+    await db.collection('equipos').doc(docId).update({
+      ...equipo,
+      modificado: new Date().toLocaleDateString('es-MX'),
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    await loadAllEquipos();
+
+    // Actualizar datos del modal de detalle para que refleje los cambios
+    currentModalEquipo = { ...equipo, firebaseId: docId };
+    currentModalDocId  = docId;
+    await renderModalDetail(currentModalEquipo);
+
+    closeEditModal();
+    alert('✅ Equipo actualizado correctamente');
+
+    // Refrescar resultados de búsqueda si hay texto
+    const searchInput = document.getElementById('search-input');
+    if (searchInput && searchInput.value.trim()) {
+      performSearch(searchInput.value.trim());
+    }
+
+  } catch (error) {
+    console.error('❌ Error actualizando:', error);
+    alert('❌ Error: ' + error.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Guardar cambios';
+  }
+}
 async function deleteSingleModal() {
   if (!currentModalDocId) {
     alert('❌ Error: No se encontró el documento');

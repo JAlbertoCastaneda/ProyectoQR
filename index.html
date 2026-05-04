@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>Inventario QR</title>
-
+ 
   <!-- Librerías externas -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
@@ -12,12 +12,12 @@
   <!--  FIREBASE -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-
+ 
   <!-- Estilos propios -->
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
+ 
 <header>
   <div class="icon-box">
     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -26,21 +26,21 @@
     </svg>
   </div>
   <h1>INVENTARIO QR/CODIGO DE BARRAS</h1>
-  <span class="version">v2.1  FIREBASE</span>
+  <span class="version">v2.5  DESING BY J. ALBERTO CASTAÑEDA</span>
 </header>
-
+ 
 <div class="tabs">
   <button class="tab active" onclick="switchTab('gen')">+ Generar QR / Código de barras</button>
   <button class="tab" onclick="switchTab('qrs')">Códigos QR generados</button>
   <button class="tab" onclick="switchTab('bars')">Códigos de barras generados</button>
   <button class="tab" onclick="switchTab('search')">🔍 Buscar equipos</button>
 </div>
-
+ 
 <!-- ═══════════════════════════════════════════════ PANEL: GENERAR -->
 <div id="panel-gen" class="panel active">
 <main>
   <p class="section-title">Datos del equipo</p>
-
+ 
   <div class="form-grid">
     <div class="field full">
       <label>ID del equipo * (asígnalo tú)</label>
@@ -91,6 +91,8 @@
         <option value="Malo">Malo</option>
         <option value="En reparación">En reparación</option>
         <option value="De baja">De baja</option>
+        <option value="Prestado">Prestado</option>
+        <option value="Disponible para prestar">Disponible para prestar</option>
       </select>
     </div>
     <div class="field">
@@ -102,7 +104,7 @@
       <textarea id="f-notas" placeholder="Accesorios incluidos, características especiales, etc."></textarea>
     </div>
   </div>
-
+ 
   <div class="btn-row">
     <button class="btn-primary" onclick="generateAll()">
       <span id="gen-btn-text">Generar</span>
@@ -110,11 +112,11 @@
     </button>
     <button onclick="clearForm()">Limpiar</button>
   </div>
-
+ 
   <div id="gen-output"></div>
 </main>
 </div>
-
+ 
 <!-- ═══════════════════════════════════════════════ PANEL: QRs -->
 <div id="panel-qrs" class="panel">
 <main>
@@ -129,7 +131,7 @@
 </div>
 </main>
 </div>
-
+ 
 <!-- ═══════════════════════════════════════════════ PANEL: BARRAS -->
 <div id="panel-bars" class="panel">
 <main>
@@ -144,7 +146,7 @@
 </div>
 </main>
 </div>
-
+ 
 <!--  ═══════════════════════════════════════════════ PANEL: BUSCADOR -->
 <div id="panel-search" class="panel">
 <main>
@@ -208,6 +210,84 @@
     </div>
   </div>
 </div>
+ 
+<!-- ═══════════════════════════════════════════════ MODAL EDICIÓN -->
+<div id="edit-modal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>✏️ Editar equipo</h2>
+      <button class="close-btn" onclick="closeEditModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-docid">
+      <div class="form-grid">
+        <div class="field full">
+          <label>ID del equipo *</label>
+          <input type="text" id="edit-id" placeholder="EQ-001">
+        </div>
+        <div class="field">
+          <label>Nombre del equipo *</label>
+          <input type="text" id="edit-nombre" placeholder="Laptop Dell Inspiron">
+        </div>
+        <div class="field">
+          <label>Número de serie</label>
+          <input type="text" id="edit-serie" placeholder="SN-2024-001">
+        </div>
+        <div class="field">
+          <label>Marca / Modelo</label>
+          <input type="text" id="edit-modelo" placeholder="Dell Inspiron 15 3520">
+        </div>
+        <div class="field">
+          <label>Categoría</label>
+          <select id="edit-categoria">
+            <option value="">Seleccionar...</option>
+            <option>Laptop</option>
+            <option>Computadora de escritorio</option>
+            <option>Monitor</option>
+            <option>Impresora</option>
+            <option>Teléfono</option>
+            <option>Tablet</option>
+            <option>Servidor</option>
+            <option>Switch / Router</option>
+            <option>Proyector</option>
+            <option>Otro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Ubicación</label>
+          <input type="text" id="edit-ubicacion" placeholder="Oficina 3, Piso 2">
+        </div>
+        <div class="field">
+          <label>Responsable</label>
+          <input type="text" id="edit-responsable" placeholder="Juan García">
+        </div>
+        <div class="field">
+          <label>Estado</label>
+          <select id="edit-estado">
+            <option value="Bueno">Bueno</option>
+            <option value="Regular">Regular</option>
+            <option value="Malo">Malo</option>
+            <option value="En reparación">En reparación</option>
+            <option value="De baja">De baja</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Fecha de registro</label>
+          <input type="date" id="edit-fecha">
+        </div>
+        <div class="field full">
+          <label>Notas / Observaciones</label>
+          <textarea id="edit-notas" placeholder="Accesorios incluidos, características especiales, etc."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="edit-save-btn" onclick="saveEditModal()">💾 Guardar cambios</button>
+      <button class="btn-secondary" onclick="closeEditModal()">❌ Cancelar</button>
+    </div>
+  </div>
+</div>
+ 
 </body>
-
+ 
 </html>
